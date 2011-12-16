@@ -1499,7 +1499,7 @@ cdef _quote_or_flatten(data, charset='utf8'):
         if value is None:
             raise ValueError('found an unsupported type')
         quoted.append(value)
-    return ','.join(quoted)
+    return '(' + ','.join(quoted) + ')'
 
 # This function is supposed to take a simple value, tuple or dictionary,
 # normally passed in via the params argument in the execute_* methods. It

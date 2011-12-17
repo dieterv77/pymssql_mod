@@ -57,19 +57,6 @@ if sys.platform == 'win32':
     FREETDS = os.path.join(WIN32, 'freetds')
     include_dirs = [os.path.join(FREETDS, 'include')]
     library_dirs = [os.path.join(FREETDS, 'lib')]
-    libraries = [
-        'libiconv',
-        'iconv',
-        'sybdb',
-        'ws2_32',
-        'wsock32',
-        'kernel32',
-    ]
-
-    _extra_compile_args.append('-Wl,-allow-multiple-definition')
-    _extra_compile_args.append('-Wl,-subsystem,windows-mthreads')
-    _extra_compile_args.append('-mwindows')
-    _extra_compile_args.append('-Wl,--strip-all')
 
 else:
     FREETDS = os.path.join(ROOT, 'freetds', 'nix_%s' % BITNESS)
@@ -104,11 +91,49 @@ class build_ext(_build_ext):
     hasn't already been done.
     """
 
+    def build_extensions(self):
+        if WINDOWS:
+            # Detect the compiler so we can specify the correct command line switches
+            # and libraries
+            from distutils.cygwinccompiler import Mingw32CCompiler
+            extra_cc_args = []
+            # Distutils bug: self.compiler can be a string or a CCompiler
+            # subclass instance, see http://bugs.python.org/issue6377
+            if isinstance(self.compiler, str):
+                compiler = self.compiler
+            elif isinstance(self.compiler, Mingw32CCompiler):
+                compiler = 'mingw32'
+            else:
+                compiler = 'msvc'
+
+            if compiler == 'msvc':
+                libraries = [
+                    'db-lib', 'tds',
+                    'ws2_32', 'wsock32', 'kernel32', 'shell32',
+                ]
+            else:
+                extra_cc_args = [
+                    '-Wl,-allow-multiple-definition',
+                    '-Wl,-subsystem,windows-mthreads',
+                    '-mwindows',
+                    '-Wl,--strip-all'
+                ]
+                libraries = [
+                    'libiconv', 'iconv',
+                    'sybdb',
+                    'ws2_32', 'wsock32', 'kernel32',
+                ]
+            for e in self.extensions:
+                e.extra_compile_args.extend(extra_cc_args)
+                e.libraries.extend(libraries)
+        _build_ext.build_extensions(self)
+        for e in self.extensions:
+            print e.libraries
+
     def run(self):
         # Not running on windows means we don't want to do this
         if not WINDOWS:
             return _build_ext.run(self)
-
 
         if os.path.isdir(FREETDS):
             return _build_ext.run(self)
@@ -279,12 +304,13 @@ setup(
                              extra_compile_args = _extra_compile_args,
                              include_dirs = include_dirs,
                              library_dirs = library_dirs,
-                             libraries = libraries),
+                             ),
                    Extension('pymssql', ['pymssql.pyx'],
                              extra_compile_args = _extra_compile_args,
                              include_dirs = include_dirs,
                              library_dirs = library_dirs,
-                             libraries = libraries)],
+                             )
+                   ],
 
     # don't remove this, otherwise the customization above in DevelopCmd
     # will break.  You can safely add to it though, if needed.

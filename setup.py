@@ -133,6 +133,8 @@ class build_ext(_build_ext):
     def run(self):
         # Not running on windows means we don't want to do this
         if not WINDOWS:
+            for e in self.extensions:
+                e.libraries.extend(libraries)
             return _build_ext.run(self)
 
         if os.path.isdir(FREETDS):
